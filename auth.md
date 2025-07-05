@@ -2,14 +2,14 @@
 
 ## API Gateway URL
 ```
-https://3p6r50x58k.execute-api.us-east-1.amazonaws.com
+https://api.sessionbase.ai
 ```
 
 ## Testing Steps for Your GitHub OAuth Implementation
 
 ### 1. **Test Public Session Creation (No Auth Required)**
 ```bash
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
+curl -X POST https://api.sessionbase.ai/sessions \
   -H "Content-Type: application/json" \
   -d '{"data": "test public session", "isPrivate": false}'
 ```
@@ -29,7 +29,7 @@ curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
 ### 2. **Test Public Session Access**
 ```bash
 # Replace {session-id} with the actual ID from step 1
-curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{session-id}
+curl https://api.sessionbase.ai/sessions/{session-id}
 ```
 
 **Expected:** Returns your session data
@@ -37,7 +37,7 @@ curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{session-id
 ### 3. **Test GitHub OAuth Flow**
 **Open this URL in your browser:**
 ```
-https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/auth/github
+https://api.sessionbase.ai/auth/github
 ```
 
 **What should happen:**
@@ -53,7 +53,7 @@ export JWT=""
 
 ### 4. **Test Private Session Creation (Requires Auth)**
 ```bash
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
+curl -X POST https://api.sessionbase.ai/sessions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $JWT" \
   -d '{"data": "my private session", "isPrivate": true}'
@@ -76,13 +76,13 @@ curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
 
 **Try without auth (should fail):**
 ```bash
-curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}
+curl https://api.sessionbase.ai/sessions/{private-session-id}
 ```
 **Expected:** `401 Authentication required for private sessions`
 
 **Try with auth (should work):**
 ```bash
-curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id} \
+curl https://api.sessionbase.ai/sessions/{private-session-id} \
   -H "Authorization: Bearer $JWT"
 ```
 **Expected:** Returns your private session data
@@ -92,7 +92,7 @@ curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-se
 **Create a share link for your private session:**
 ```bash
 # Replace {private-session-id} with your private session ID from step 4
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share \
+curl -X POST https://api.sessionbase.ai/sessions/{private-session-id}/share \
   -H "Authorization: Bearer $JWT"
 ```
 
@@ -100,7 +100,7 @@ curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{pr
 ```json
 {
   "shareToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "shareUrl": "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/shared/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "shareUrl": "https://api.sessionbase.ai/shared/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "sessionId": "your-session-id",
   "expiresIn": "30d",
   "createdAt": "2025-07-05T14:00:00.000Z"
@@ -110,19 +110,19 @@ curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{pr
 **Optional: Create share link with custom expiration:**
 ```bash
 # 7 days
-curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share?expires=7d" \
+curl -X POST "https://api.sessionbase.ai/sessions/{private-session-id}/share?expires=7d" \
   -H "Authorization: Bearer $JWT"
 
 # 90 days  
-curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share?expires=90d" \
+curl -X POST "https://api.sessionbase.ai/sessions/{private-session-id}/share?expires=90d" \
   -H "Authorization: Bearer $JWT"
 
 # 1 year
-curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share?expires=1y" \
+curl -X POST "https://api.sessionbase.ai/sessions/{private-session-id}/share?expires=1y" \
   -H "Authorization: Bearer $JWT"
 
 # Never expires (permanent link)
-curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share?expires=never" \
+curl -X POST "https://api.sessionbase.ai/sessions/{private-session-id}/share?expires=never" \
   -H "Authorization: Bearer $JWT"
 ```
 
@@ -130,7 +130,7 @@ curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{p
 ```json
 {
   "shareToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "shareUrl": "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/shared/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "shareUrl": "https://api.sessionbase.ai/shared/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "sessionId": "your-session-id",
   "expiresIn": "never",
   "hasExpiration": false,
@@ -143,7 +143,7 @@ curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{p
 **Access the private session via share link (no auth required):**
 ```bash
 # Use the shareUrl from step 6, or construct it manually:
-curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/shared/{share-token}
+curl https://api.sessionbase.ai/shared/{share-token}
 ```
 
 **Expected:** Returns the private session data with additional headers:
@@ -157,7 +157,7 @@ curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/shared/{share-token}
 **Test expired share link:**
 ```bash
 # This would return 410 Gone if the share token has expired
-curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/shared/{expired-share-token}
+curl https://api.sessionbase.ai/shared/{expired-share-token}
 ```
 **Expected:** `410 Share link has expired`
 
@@ -165,7 +165,7 @@ curl https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/shared/{expired-shar
 
 **Try to share a public session (should fail):**
 ```bash
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{public-session-id}/share \
+curl -X POST https://api.sessionbase.ai/sessions/{public-session-id}/share \
   -H "Authorization: Bearer $JWT"
 ```
 **Expected:** `400 Only private sessions can be shared via links`
@@ -173,20 +173,20 @@ curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{pu
 **Try to share someone else's private session (should fail):**
 ```bash
 # This would require having another user's private session ID
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{other-users-session}/share \
+curl -X POST https://api.sessionbase.ai/sessions/{other-users-session}/share \
   -H "Authorization: Bearer $JWT"
 ```
 **Expected:** `403 You can only create share links for your own sessions`
 
 **Try to create share link without auth (should fail):**
 ```bash
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share
+curl -X POST https://api.sessionbase.ai/sessions/{private-session-id}/share
 ```
 **Expected:** `401 Authentication required`
 
 **Try invalid expiration option (should fail):**
 ```bash
-curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{private-session-id}/share?expires=invalid" \
+curl -X POST "https://api.sessionbase.ai/sessions/{private-session-id}/share?expires=invalid" \
   -H "Authorization: Bearer $JWT"
 ```
 **Expected:** `400 Invalid expiration option. Valid options: 7d, 30d, 90d, 1y, never`
@@ -195,7 +195,7 @@ curl -X POST "https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions/{p
 
 **Create private session without auth (should fail):**
 ```bash
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
+curl -X POST https://api.sessionbase.ai/sessions \
   -H "Content-Type: application/json" \
   -d '{"data": "trying to be private", "isPrivate": true}'
 ```
@@ -203,7 +203,7 @@ curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
 
 **Create public session while authenticated (should work):**
 ```bash
-curl -X POST https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/sessions \
+curl -X POST https://api.sessionbase.ai/sessions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $JWT" \
   -d '{"data": "public but by authenticated user", "isPrivate": false}'
@@ -245,4 +245,4 @@ The sharing functionality allows:
 - **Expired share links** return 410 Gone with clear error message
 - Start with step 1 and work your way through
 - The OAuth flow (step 3) requires a browser, not just curl
-- Make sure your GitHub OAuth app callback URL is set to: `https://3p6r50x58k.execute-api.us-east-1.amazonaws.com/auth/github/callback`
+- Make sure your GitHub OAuth app callback URL is set to: `https://api.sessionbase.ai/auth/github/callback`

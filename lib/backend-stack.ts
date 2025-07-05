@@ -6,6 +6,9 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as apiGW from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apiGWIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as certificateManager from 'aws-cdk-lib/aws-certificatemanager';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 
 export class BackendStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -115,6 +118,41 @@ export class BackendStack extends Stack {
       },
     });
 
+    // Create hosted zone for sessionbase.ai
+    const hostedZone = new route53.HostedZone(this, 'SessionbaseHostedZone', {
+      zoneName: 'sessionbase.ai',
+    });
+
+    // Create SSL certificate for api.sessionbase.ai
+    const certificate = new certificateManager.Certificate(this, 'ApiCertificate', {
+      domainName: 'api.sessionbase.ai',
+      validation: certificateManager.CertificateValidation.fromDns(hostedZone),
+    });
+
+    // Create custom domain name for API Gateway
+    const domainName = new apiGW.DomainName(this, 'ApiDomainName', {
+      domainName: 'api.sessionbase.ai',
+      certificate: certificate,
+    });
+
+    // Create API mapping
+    new apiGW.ApiMapping(this, 'ApiMapping', {
+      api: httpApi,
+      domainName: domainName,
+    });
+
+    // Create A record pointing to the API Gateway custom domain
+    new route53.ARecord(this, 'ApiAliasRecord', {
+      zone: hostedZone,
+      recordName: 'api',
+      target: route53.RecordTarget.fromAlias(
+        new route53Targets.ApiGatewayv2DomainProperties(
+          domainName.regionalDomainName,
+          domainName.regionalHostedZoneId
+        )
+      ),
+    });
+
     // Session routes
     httpApi.addRoutes({
       path: '/sessions',
@@ -164,6 +202,21 @@ export class BackendStack extends Stack {
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
       description: 'The URL of the API Gateway',
+    });
+
+    new cdk.CfnOutput(this, 'CustomDomainUrl', {
+      value: `https://api.sessionbase.ai`,
+      description: 'The custom domain URL for your API',
+    });
+
+    new cdk.CfnOutput(this, 'HostedZoneId', {
+      value: hostedZone.hostedZoneId,
+      description: 'The Route 53 Hosted Zone ID for sessionbase.ai',
+    });
+
+    new cdk.CfnOutput(this, 'NameServers', {
+      value: cdk.Fn.join(', ', hostedZone.hostedZoneNameServers || []),
+      description: 'Name servers to configure in GoDaddy',
     });
   }
 }
