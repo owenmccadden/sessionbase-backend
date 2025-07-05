@@ -11,26 +11,51 @@ export class BackendStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
+    // S3 buckets for sessions and users
     const sessionBucket = new s3.Bucket(this, 'sessionBucket');
+    const userBucket = new s3.Bucket(this, 'userBucket');
 
+    // Common environment variables for all functions
+    const commonEnv = {
+      SESSION_BUCKET_NAME: sessionBucket.bucketName,
+      USER_BUCKET_NAME: userBucket.bucketName,
+      JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-change-this',
+      GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
+      GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
+      FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+    };
+
+    // Session management functions
     const createSession = new lambda.Function(this, 'createSession', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'createSession.main',
-      environment: {
-        BUCKET_NAME: sessionBucket.bucketName,
-      },
+      environment: commonEnv,
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
     const getSession = new lambda.Function(this, 'getSession', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'getSession.main',
-      environment: {
-        BUCKET_NAME: sessionBucket.bucketName,
-      },
+      environment: commonEnv,
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    // OAuth functions
+    const githubAuth = new lambda.Function(this, 'githubAuth', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'githubAuth.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const githubCallback = new lambda.Function(this, 'githubCallback', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'githubCallback.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
       createSession
@@ -41,14 +66,31 @@ export class BackendStack extends Stack {
       getSession
     );
 
+    const githubAuthIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'githubAuthIntegration',
+      githubAuth
+    );
+
+    const githubCallbackIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'githubCallbackIntegration',
+      githubCallback
+    );
+
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
       corsPreflight: {
-        allowHeaders: ['Authorization'],
-        allowMethods: [apiGW.CorsHttpMethod.POST, apiGW.CorsHttpMethod.GET],
+        allowHeaders: ['Authorization', 'Content-Type'],
+        allowMethods: [
+          apiGW.CorsHttpMethod.POST,
+          apiGW.CorsHttpMethod.GET,
+          apiGW.CorsHttpMethod.PUT,
+          apiGW.CorsHttpMethod.DELETE,
+          apiGW.CorsHttpMethod.OPTIONS
+        ],
         allowOrigins: ['*'],
       },
     });
 
+    // Session routes
     httpApi.addRoutes({
       path: '/sessions',
       methods: [apiGW.HttpMethod.POST],
@@ -61,8 +103,23 @@ export class BackendStack extends Stack {
       integration: getSessionIntegration,
     });
 
-    sessionBucket.grantWrite(createSession);
+    // OAuth routes
+    httpApi.addRoutes({
+      path: '/auth/github',
+      methods: [apiGW.HttpMethod.GET],
+      integration: githubAuthIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/github/callback',
+      methods: [apiGW.HttpMethod.GET],
+      integration: githubCallbackIntegration,
+    });
+
+    // Grant permissions
+    sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
+    userBucket.grantReadWrite(githubCallback);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
