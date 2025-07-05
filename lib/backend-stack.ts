@@ -40,6 +40,21 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    // Sharing functions
+    const createShareLink = new lambda.Function(this, 'createShareLink', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'createShareLink.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const getSharedSession = new lambda.Function(this, 'getSharedSession', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getSharedSession.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // OAuth functions
     const githubAuth = new lambda.Function(this, 'githubAuth', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -64,6 +79,16 @@ export class BackendStack extends Stack {
     const getSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'getSessionIntegration',
       getSession
+    );
+
+    const createShareLinkIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'createShareLinkIntegration',
+      createShareLink
+    );
+
+    const getSharedSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'getSharedSessionIntegration',
+      getSharedSession
     );
 
     const githubAuthIntegration = new apiGWIntegrations.HttpLambdaIntegration(
@@ -103,6 +128,19 @@ export class BackendStack extends Stack {
       integration: getSessionIntegration,
     });
 
+    // Sharing routes
+    httpApi.addRoutes({
+      path: '/sessions/{id}/share',
+      methods: [apiGW.HttpMethod.POST],
+      integration: createShareLinkIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/shared/{token}',
+      methods: [apiGW.HttpMethod.GET],
+      integration: getSharedSessionIntegration,
+    });
+
     // OAuth routes
     httpApi.addRoutes({
       path: '/auth/github',
@@ -119,6 +157,8 @@ export class BackendStack extends Stack {
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
+    sessionBucket.grantRead(createShareLink);
+    sessionBucket.grantRead(getSharedSession);
     userBucket.grantReadWrite(githubCallback);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
