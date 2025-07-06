@@ -153,6 +153,27 @@ export class BackendStack extends Stack {
       ),
     });
 
+    // Add MX records for ImprovMX email forwarding
+    new route53.MxRecord(this, 'ImprovMxRecord', {
+      zone: hostedZone,
+      values: [
+        {
+          hostName: 'mx1.improvmx.com',
+          priority: 10,
+        },
+        {
+          hostName: 'mx2.improvmx.com',
+          priority: 20,
+        },
+      ],
+    });
+
+    // Add SPF TXT record for ImprovMX
+    new route53.TxtRecord(this, 'ImprovSpfRecord', {
+      zone: hostedZone,
+      values: ['v=spf1 include:spf.improvmx.com ~all'],
+    });
+
     // Session routes
     httpApi.addRoutes({
       path: '/sessions',
