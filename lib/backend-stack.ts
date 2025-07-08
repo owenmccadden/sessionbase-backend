@@ -4,6 +4,7 @@ import { Stack, StackProps } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apiGW from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apiGWIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as certificateManager from 'aws-cdk-lib/aws-certificatemanager';
@@ -14,14 +15,49 @@ export class BackendStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    // S3 buckets for sessions and users
+    // S3 bucket for session content storage
     const sessionBucket = new s3.Bucket(this, 'sessionBucket');
-    const userBucket = new s3.Bucket(this, 'userBucket');
+
+    // DynamoDB table for session metadata
+    const sessionMetadataTable = new dynamodb.Table(this, 'SessionMetadataTable', {
+      tableName: 'SessionMetadata',
+      partitionKey: {
+        name: 'sessionId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect against accidental deletion
+    });
+
+    // Add Global Secondary Index for querying by user
+    sessionMetadataTable.addGlobalSecondaryIndex({
+      indexName: 'UserIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'createdAt',
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    // DynamoDB table for user metadata
+    const userMetadataTable = new dynamodb.Table(this, 'UserMetadataTable', {
+      tableName: 'UserMetadata',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect against accidental deletion
+    });
 
     // Common environment variables for all functions
     const commonEnv = {
       SESSION_BUCKET_NAME: sessionBucket.bucketName,
-      USER_BUCKET_NAME: userBucket.bucketName,
+      SESSION_METADATA_TABLE_NAME: sessionMetadataTable.tableName,
+      USER_METADATA_TABLE_NAME: userMetadataTable.tableName,
       JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-change-this',
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
@@ -39,6 +75,27 @@ export class BackendStack extends Stack {
     const getSession = new lambda.Function(this, 'getSession', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'getSession.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const listSessions = new lambda.Function(this, 'listSessions', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'listSessions.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const discoverSessions = new lambda.Function(this, 'discoverSessions', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'discoverSessions.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const updateSessionMetadata = new lambda.Function(this, 'updateSessionMetadata', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'updateSessionMetadata.main',
       environment: commonEnv,
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
@@ -82,6 +139,21 @@ export class BackendStack extends Stack {
     const getSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'getSessionIntegration',
       getSession
+    );
+
+    const listSessionsIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'listSessionsIntegration',
+      listSessions
+    );
+
+    const discoverSessionsIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'discoverSessionsIntegration',
+      discoverSessions
+    );
+
+    const updateSessionMetadataIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'updateSessionMetadataIntegration',
+      updateSessionMetadata
     );
 
     const createShareLinkIntegration = new apiGWIntegrations.HttpLambdaIntegration(
@@ -182,9 +254,28 @@ export class BackendStack extends Stack {
     });
 
     httpApi.addRoutes({
+      path: '/sessions',
+      methods: [apiGW.HttpMethod.GET],
+      integration: listSessionsIntegration,
+    });
+
+    httpApi.addRoutes({
       path: '/sessions/{id}',
       methods: [apiGW.HttpMethod.GET],
       integration: getSessionIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/sessions/{id}/metadata',
+      methods: [apiGW.HttpMethod.PUT],
+      integration: updateSessionMetadataIntegration,
+    });
+
+    // Public discovery route
+    httpApi.addRoutes({
+      path: '/discover',
+      methods: [apiGW.HttpMethod.GET],
+      integration: discoverSessionsIntegration,
     });
 
     // Sharing routes
@@ -218,7 +309,18 @@ export class BackendStack extends Stack {
     sessionBucket.grantRead(getSession);
     sessionBucket.grantRead(createShareLink);
     sessionBucket.grantRead(getSharedSession);
-    userBucket.grantReadWrite(githubCallback);
+
+    // Grant DynamoDB permissions
+    sessionMetadataTable.grantReadWriteData(createSession);
+    sessionMetadataTable.grantReadData(getSession);
+    sessionMetadataTable.grantReadData(listSessions);
+    sessionMetadataTable.grantReadData(discoverSessions);
+    sessionMetadataTable.grantReadWriteData(updateSessionMetadata);
+    sessionMetadataTable.grantReadData(createShareLink);
+    sessionMetadataTable.grantReadData(getSharedSession);
+
+    // Grant user metadata table permissions
+    userMetadataTable.grantReadWriteData(githubCallback);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
