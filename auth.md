@@ -51,6 +51,23 @@ https://api.sessionbase.ai/auth/github
 export JWT=""
 ```
 
+### 3b. **Test Google OAuth Flow**
+**Open this URL in your browser:**
+```
+https://api.sessionbase.ai/auth/google
+```
+
+**What should happen:**
+1. Redirects to Google OAuth page with your app details
+2. You authorize the app
+3. Google redirects back to your callback
+4. You get redirected to `http://localhost:3000?token=eyJ...`
+5. **Copy the JWT token** from the URL (everything after `token=`)
+6. **Use the same JWT environment variable:**
+```bash
+export JWT=""
+```
+
 ### 4. **Test Private Session Creation (Requires Auth)**
 ```bash
 curl -X POST https://api.sessionbase.ai/sessions \

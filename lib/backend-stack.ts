@@ -61,6 +61,8 @@ export class BackendStack extends Stack {
       JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-change-this',
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
       FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
     };
 
@@ -130,6 +132,20 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    const googleAuth = new lambda.Function(this, 'googleAuth', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'googleAuth.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const googleCallback = new lambda.Function(this, 'googleCallback', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'googleCallback.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
@@ -174,6 +190,16 @@ export class BackendStack extends Stack {
     const githubCallbackIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'githubCallbackIntegration',
       githubCallback
+    );
+
+    const googleAuthIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'googleAuthIntegration',
+      googleAuth
+    );
+
+    const googleCallbackIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'googleCallbackIntegration',
+      googleCallback
     );
 
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
@@ -304,6 +330,18 @@ export class BackendStack extends Stack {
       integration: githubCallbackIntegration,
     });
 
+    httpApi.addRoutes({
+      path: '/auth/google',
+      methods: [apiGW.HttpMethod.GET],
+      integration: googleAuthIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/google/callback',
+      methods: [apiGW.HttpMethod.GET],
+      integration: googleCallbackIntegration,
+    });
+
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
@@ -321,6 +359,7 @@ export class BackendStack extends Stack {
 
     // Grant user metadata table permissions
     userMetadataTable.grantReadWriteData(githubCallback);
+    userMetadataTable.grantReadWriteData(googleCallback);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
