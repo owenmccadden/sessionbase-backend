@@ -146,6 +146,13 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    const getUserWithPublicSessions = new lambda.Function(this, 'getUserWithPublicSessions', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'getUserWithPublicSessions.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
@@ -200,6 +207,11 @@ export class BackendStack extends Stack {
     const googleCallbackIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'googleCallbackIntegration',
       googleCallback
+    );
+
+    const getUserWithPublicSessionsIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'getUserWithPublicSessionsIntegration',
+      getUserWithPublicSessions
     );
 
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
@@ -342,6 +354,13 @@ export class BackendStack extends Stack {
       integration: googleCallbackIntegration,
     });
 
+    // User routes
+    httpApi.addRoutes({
+      path: '/users/{id}',
+      methods: [apiGW.HttpMethod.GET],
+      integration: getUserWithPublicSessionsIntegration,
+    });
+
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
@@ -360,6 +379,10 @@ export class BackendStack extends Stack {
     // Grant user metadata table permissions
     userMetadataTable.grantReadWriteData(githubCallback);
     userMetadataTable.grantReadWriteData(googleCallback);
+    userMetadataTable.grantReadData(getUserWithPublicSessions);
+
+    // Grant session metadata table permissions for getUserWithPublicSessions
+    sessionMetadataTable.grantReadData(getUserWithPublicSessions);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
