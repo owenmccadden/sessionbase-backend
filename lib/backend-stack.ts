@@ -261,6 +261,13 @@ export class BackendStack extends Stack {
       values: ['v=spf1 include:spf.improvmx.com ~all'],
     });
 
+    // CNAME record for docs subdomain (Mintlify/Vercel)
+    new route53.CnameRecord(this, 'DocsRecord', {
+      zone: hostedZone,
+      recordName: 'docs',
+      domainName: 'cname.vercel-dns.com.',
+    });
+
     // Session routes
     httpApi.addRoutes({
       path: '/sessions',
