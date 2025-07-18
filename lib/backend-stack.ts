@@ -102,20 +102,6 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
-    // Sharing functions
-    const createShareLink = new lambda.Function(this, 'createShareLink', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'createShareLink.main',
-      environment: commonEnv,
-      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
-    });
-
-    const getSharedSession = new lambda.Function(this, 'getSharedSession', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'getSharedSession.main',
-      environment: commonEnv,
-      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
-    });
 
     // OAuth functions
     const githubAuth = new lambda.Function(this, 'githubAuth', {
@@ -179,15 +165,6 @@ export class BackendStack extends Stack {
       updateSessionMetadata
     );
 
-    const createShareLinkIntegration = new apiGWIntegrations.HttpLambdaIntegration(
-      'createShareLinkIntegration',
-      createShareLink
-    );
-
-    const getSharedSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
-      'getSharedSessionIntegration',
-      getSharedSession
-    );
 
     const githubAuthIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'githubAuthIntegration',
@@ -316,18 +293,6 @@ export class BackendStack extends Stack {
       integration: discoverSessionsIntegration,
     });
 
-    // Sharing routes
-    httpApi.addRoutes({
-      path: '/sessions/{id}/share',
-      methods: [apiGW.HttpMethod.POST],
-      integration: createShareLinkIntegration,
-    });
-
-    httpApi.addRoutes({
-      path: '/shared/{token}',
-      methods: [apiGW.HttpMethod.GET],
-      integration: getSharedSessionIntegration,
-    });
 
     // OAuth routes
     httpApi.addRoutes({
@@ -364,8 +329,6 @@ export class BackendStack extends Stack {
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
-    sessionBucket.grantRead(createShareLink);
-    sessionBucket.grantRead(getSharedSession);
 
     // Grant DynamoDB permissions
     sessionMetadataTable.grantReadWriteData(createSession);
@@ -373,8 +336,6 @@ export class BackendStack extends Stack {
     sessionMetadataTable.grantReadData(listSessions);
     sessionMetadataTable.grantReadData(discoverSessions);
     sessionMetadataTable.grantReadWriteData(updateSessionMetadata);
-    sessionMetadataTable.grantReadData(createShareLink);
-    sessionMetadataTable.grantReadData(getSharedSession);
 
     // Grant user metadata table permissions
     userMetadataTable.grantReadWriteData(githubCallback);
