@@ -53,6 +53,17 @@ export class BackendStack extends Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect against accidental deletion
     });
 
+    // DynamoDB table for teams email signups
+    const teamsEmailSignupsTable = new dynamodb.Table(this, 'TeamsEmailSignupsTable', {
+      tableName: 'TeamsEmailSignups',
+      partitionKey: {
+        name: 'email',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect against accidental deletion
+    });
+
     // Common environment variables for all functions
     const commonEnv = {
       SESSION_BUCKET_NAME: sessionBucket.bucketName,
@@ -139,6 +150,13 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    const teamsEmailSignup = new lambda.Function(this, 'teamsEmailSignup', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'teamsEmailSignup.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
@@ -189,6 +207,11 @@ export class BackendStack extends Stack {
     const getUserWithPublicSessionsIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'getUserWithPublicSessionsIntegration',
       getUserWithPublicSessions
+    );
+
+    const teamsEmailSignupIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'teamsEmailSignupIntegration',
+      teamsEmailSignup
     );
 
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
@@ -333,6 +356,13 @@ export class BackendStack extends Stack {
       integration: getUserWithPublicSessionsIntegration,
     });
 
+    // Teams email signup route
+    httpApi.addRoutes({
+      path: '/teams/email-signup',
+      methods: [apiGW.HttpMethod.POST],
+      integration: teamsEmailSignupIntegration,
+    });
+
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
@@ -351,6 +381,9 @@ export class BackendStack extends Stack {
 
     // Grant session metadata table permissions for getUserWithPublicSessions
     sessionMetadataTable.grantReadData(getUserWithPublicSessions);
+
+    // Grant teams email signups table permissions
+    teamsEmailSignupsTable.grantReadWriteData(teamsEmailSignup);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
