@@ -113,6 +113,12 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    const deleteSession = new lambda.Function(this, 'deleteSession', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'deleteSession.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
 
     // OAuth functions
     const githubAuth = new lambda.Function(this, 'githubAuth', {
@@ -183,6 +189,10 @@ export class BackendStack extends Stack {
       updateSessionMetadata
     );
 
+    const deleteSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'deleteSessionIntegration',
+      deleteSession
+    );
 
     const githubAuthIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'githubAuthIntegration',
@@ -316,6 +326,12 @@ export class BackendStack extends Stack {
       integration: updateSessionMetadataIntegration,
     });
 
+    httpApi.addRoutes({
+      path: '/sessions/{id}',
+      methods: [apiGW.HttpMethod.DELETE],
+      integration: deleteSessionIntegration,
+    });
+
     // Public discovery route
     httpApi.addRoutes({
       path: '/discover',
@@ -366,6 +382,7 @@ export class BackendStack extends Stack {
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
+    sessionBucket.grantDelete(deleteSession);
 
     // Grant DynamoDB permissions
     sessionMetadataTable.grantReadWriteData(createSession);
@@ -373,6 +390,7 @@ export class BackendStack extends Stack {
     sessionMetadataTable.grantReadData(listSessions);
     sessionMetadataTable.grantReadData(discoverSessions);
     sessionMetadataTable.grantReadWriteData(updateSessionMetadata);
+    sessionMetadataTable.grantReadWriteData(deleteSession);
 
     // Grant user metadata table permissions
     userMetadataTable.grantReadWriteData(githubCallback);
