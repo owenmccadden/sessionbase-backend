@@ -75,6 +75,7 @@ export class BackendStack extends Stack {
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
       FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+      BLOCKED_USER_IDS: process.env.BLOCKED_USER_IDS || '',
     };
 
     // Session management functions
