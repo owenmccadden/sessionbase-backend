@@ -53,6 +53,15 @@ export class BackendStack extends Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect against accidental deletion
     });
 
+    // Add Global Secondary Index for querying by API key
+    userMetadataTable.addGlobalSecondaryIndex({
+      indexName: 'ApiKeyIndex',
+      partitionKey: {
+        name: 'apiKey',
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     // DynamoDB table for teams email signups
     const teamsEmailSignupsTable = new dynamodb.Table(this, 'TeamsEmailSignupsTable', {
       tableName: 'TeamsEmailSignups',
@@ -177,6 +186,28 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    // API key management functions
+    const apiKeyRotate = new lambda.Function(this, 'apiKeyRotate', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'apiKeyRotate.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const apiKeyInfo = new lambda.Function(this, 'apiKeyInfo', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'apiKeyInfo.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const authMe = new lambda.Function(this, 'authMe', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'authMe.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
@@ -236,6 +267,21 @@ export class BackendStack extends Stack {
     const teamsEmailSignupIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'teamsEmailSignupIntegration',
       teamsEmailSignup
+    );
+
+    const apiKeyRotateIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'apiKeyRotateIntegration',
+      apiKeyRotate
+    );
+
+    const apiKeyInfoIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'apiKeyInfoIntegration',
+      apiKeyInfo
+    );
+
+    const authMeIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'authMeIntegration',
+      authMe
     );
 
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
@@ -393,6 +439,25 @@ export class BackendStack extends Stack {
       integration: teamsEmailSignupIntegration,
     });
 
+    // API key management routes
+    httpApi.addRoutes({
+      path: '/auth/api-key/rotate',
+      methods: [apiGW.HttpMethod.POST],
+      integration: apiKeyRotateIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/api-key/info',
+      methods: [apiGW.HttpMethod.GET],
+      integration: apiKeyInfoIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/me',
+      methods: [apiGW.HttpMethod.GET],
+      integration: authMeIntegration,
+    });
+
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
@@ -410,6 +475,16 @@ export class BackendStack extends Stack {
     userMetadataTable.grantReadWriteData(githubCallback);
     userMetadataTable.grantReadWriteData(googleCallback);
     userMetadataTable.grantReadData(getUserWithPublicSessions);
+    userMetadataTable.grantReadWriteData(apiKeyRotate);
+    userMetadataTable.grantReadData(apiKeyInfo);
+    userMetadataTable.grantReadData(authMe);
+    
+    // Grant API key lookup permissions to session functions (for API key auth)
+    userMetadataTable.grantReadData(createSession);
+    userMetadataTable.grantReadData(getSession);
+    userMetadataTable.grantReadData(listSessions);
+    userMetadataTable.grantReadData(updateSessionMetadata);
+    userMetadataTable.grantReadData(deleteSession);
 
     // Grant session metadata table permissions for getUserWithPublicSessions
     sessionMetadataTable.grantReadData(getUserWithPublicSessions);
