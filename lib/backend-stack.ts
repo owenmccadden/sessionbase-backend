@@ -208,6 +208,13 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    const authExchange = new lambda.Function(this, 'authExchange', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'authExchange.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
@@ -282,6 +289,11 @@ export class BackendStack extends Stack {
     const authMeIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'authMeIntegration',
       authMe
+    );
+
+    const authExchangeIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'authExchangeIntegration',
+      authExchange
     );
 
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
@@ -458,6 +470,12 @@ export class BackendStack extends Stack {
       integration: authMeIntegration,
     });
 
+    httpApi.addRoutes({
+      path: '/auth/exchange',
+      methods: [apiGW.HttpMethod.GET, apiGW.HttpMethod.POST],
+      integration: authExchangeIntegration,
+    });
+
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
@@ -497,6 +515,7 @@ export class BackendStack extends Stack {
     oauthStateTable.grantReadWriteData(githubCallback);
     oauthStateTable.grantReadWriteData(googleAuth);
     oauthStateTable.grantReadWriteData(googleCallback);
+    oauthStateTable.grantReadWriteData(authExchange);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
