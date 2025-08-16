@@ -64,11 +64,24 @@ export class BackendStack extends Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect against accidental deletion
     });
 
+    // DynamoDB table for OAuth state validation with TTL
+    const oauthStateTable = new dynamodb.Table(this, 'OAuthStateTable', {
+      tableName: 'OAuthState',
+      partitionKey: {
+        name: 'state',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      timeToLiveAttribute: 'ttl', // Enable TTL for automatic cleanup
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // Can be recreated, no user data
+    });
+
     // Common environment variables for all functions
     const commonEnv = {
       SESSION_BUCKET_NAME: sessionBucket.bucketName,
       SESSION_METADATA_TABLE_NAME: sessionMetadataTable.tableName,
       USER_METADATA_TABLE_NAME: userMetadataTable.tableName,
+      OAUTH_STATE_TABLE_NAME: oauthStateTable.tableName,
       JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-change-this',
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || '',
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || '',
@@ -403,6 +416,12 @@ export class BackendStack extends Stack {
 
     // Grant teams email signups table permissions
     teamsEmailSignupsTable.grantReadWriteData(teamsEmailSignup);
+
+    // Grant OAuth state table permissions
+    oauthStateTable.grantReadWriteData(githubAuth);
+    oauthStateTable.grantReadWriteData(githubCallback);
+    oauthStateTable.grantReadWriteData(googleAuth);
+    oauthStateTable.grantReadWriteData(googleCallback);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
