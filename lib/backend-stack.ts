@@ -215,6 +215,28 @@ export class BackendStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
     });
 
+    // Device flow functions
+    const deviceStart = new lambda.Function(this, 'deviceStart', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'deviceStart.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const devicePoll = new lambda.Function(this, 'devicePoll', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'devicePoll.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
+    const deviceComplete = new lambda.Function(this, 'deviceComplete', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'deviceComplete.main',
+      environment: commonEnv,
+      code: lambda.Code.fromAsset(path.join(__dirname, 'session-lambdas')),
+    });
+
     // API Gateway integrations
     const createSessionIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'createSessionIntegration',
@@ -294,6 +316,21 @@ export class BackendStack extends Stack {
     const authExchangeIntegration = new apiGWIntegrations.HttpLambdaIntegration(
       'authExchangeIntegration',
       authExchange
+    );
+
+    const deviceStartIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'deviceStartIntegration',
+      deviceStart
+    );
+
+    const devicePollIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'devicePollIntegration',
+      devicePoll
+    );
+
+    const deviceCompleteIntegration = new apiGWIntegrations.HttpLambdaIntegration(
+      'deviceCompleteIntegration',
+      deviceComplete
     );
 
     const httpApi = new apiGW.HttpApi(this, 'HttpApi', {
@@ -476,6 +513,25 @@ export class BackendStack extends Stack {
       integration: authExchangeIntegration,
     });
 
+    // Device flow routes
+    httpApi.addRoutes({
+      path: '/auth/device/start',
+      methods: [apiGW.HttpMethod.POST],
+      integration: deviceStartIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/device/poll',
+      methods: [apiGW.HttpMethod.POST],
+      integration: devicePollIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/auth/device/complete',
+      methods: [apiGW.HttpMethod.POST],
+      integration: deviceCompleteIntegration,
+    });
+
     // Grant permissions
     sessionBucket.grantReadWrite(createSession);
     sessionBucket.grantRead(getSession);
@@ -496,6 +552,7 @@ export class BackendStack extends Stack {
     userMetadataTable.grantReadWriteData(apiKeyRotate);
     userMetadataTable.grantReadData(apiKeyInfo);
     userMetadataTable.grantReadData(authMe);
+    userMetadataTable.grantReadData(deviceComplete);
     
     // Grant API key lookup permissions to session functions (for API key auth)
     userMetadataTable.grantReadData(createSession);
@@ -516,6 +573,9 @@ export class BackendStack extends Stack {
     oauthStateTable.grantReadWriteData(googleAuth);
     oauthStateTable.grantReadWriteData(googleCallback);
     oauthStateTable.grantReadWriteData(authExchange);
+    oauthStateTable.grantReadWriteData(deviceStart);
+    oauthStateTable.grantReadWriteData(devicePoll);
+    oauthStateTable.grantReadWriteData(deviceComplete);
 
     new cdk.CfnOutput(this, 'ApiGatewayUrl', {
       value: httpApi.apiEndpoint,
