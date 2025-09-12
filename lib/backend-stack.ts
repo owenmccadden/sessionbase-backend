@@ -407,7 +407,10 @@ export class BackendStack extends Stack {
     new route53.TxtRecord(this, 'VercelDomainVerification', {
       zone: hostedZone,
       recordName: '_vercel',
-      values: ['vc-domain-verify=www.sessionbase.ai,a6ae491c1084390c5ad6'],
+      values: [
+        'vc-domain-verify=www.sessionbase.ai,a6ae491c1084390c5ad6',
+        'vc-domain-verify=sessionbase.ai,3e5e54573c92e88e8f46'
+      ],
     });
 
     // CNAME record for docs subdomain (Mintlify/Vercel)
@@ -422,6 +425,12 @@ export class BackendStack extends Stack {
       zone: hostedZone,
       recordName: 'www',
       domainName: '38a6c911a22e76cd.vercel-dns-016.com.',
+    });
+
+    // A record for apex domain (Vercel)
+    new route53.ARecord(this, 'ApexDomainRecord', {
+      zone: hostedZone,
+      target: route53.RecordTarget.fromIpAddresses('216.150.1.1'),
     });
 
     // Session routes
