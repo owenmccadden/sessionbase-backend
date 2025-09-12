@@ -403,11 +403,25 @@ export class BackendStack extends Stack {
       values: ['v=spf1 include:spf.improvmx.com ~all'],
     });
 
+    // Add TXT record for Vercel domain verification
+    new route53.TxtRecord(this, 'VercelDomainVerification', {
+      zone: hostedZone,
+      recordName: '_vercel',
+      values: ['vc-domain-verify=www.sessionbase.ai,a6ae491c1084390c5ad6'],
+    });
+
     // CNAME record for docs subdomain (Mintlify/Vercel)
     new route53.CnameRecord(this, 'DocsRecord', {
       zone: hostedZone,
       recordName: 'docs',
       domainName: 'cname.vercel-dns.com.',
+    });
+
+    // CNAME record for www subdomain (Vercel)
+    new route53.CnameRecord(this, 'WwwRecord', {
+      zone: hostedZone,
+      recordName: 'www',
+      domainName: '38a6c911a22e76cd.vercel-dns-016.com.',
     });
 
     // Session routes
