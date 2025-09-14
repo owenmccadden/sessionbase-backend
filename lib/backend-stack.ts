@@ -397,10 +397,13 @@ export class BackendStack extends Stack {
       ],
     });
 
-    // Add SPF TXT record for ImprovMX
+    // Add combined TXT records for apex domain (SPF + Google verification)
     new route53.TxtRecord(this, 'ImprovSpfRecord', {
       zone: hostedZone,
-      values: ['v=spf1 include:spf.improvmx.com ~all'],
+      values: [
+        'v=spf1 include:spf.improvmx.com ~all',
+        'google-site-verification=q0xhDewU6597Fa9QCU5vu6fRRQFOVdemF5dPwvsJVXY'
+      ],
     });
 
     // Add TXT record for Vercel domain verification
